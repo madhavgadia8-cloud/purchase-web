@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { db, money } from "@/lib/db";
-import { deleteRfq, sendRfqEmail } from "@/app/actions";
+import { deleteRfq, sendRfqEmail, approveInbound, rejectInbound } from "@/app/actions";
 import CopyLink from "@/app/rfq/[id]/CopyLink";
 import AdminShell from "@/app/AdminShell";
 
@@ -25,6 +25,8 @@ export default async function RfqDetail({ params, searchParams }) {
     .from("quotes").select("*").eq("rfq_id", id).order("submitted_at");
   const { data: suppliers = [] } = await supabase
     .from("suppliers").select("*").order("name");
+  const { data: inbound = [] } = await supabase
+    .from("inbound_quotes").select("*").eq("rfq_id", id).eq("status", "pending").order("created_at");
 
   let lines = [];
   if (quotes.length) {
@@ -160,6 +162,69 @@ export default async function RfqDetail({ params, searchParams }) {
             <button className="btn sm" type="submit">Send email</button>
           </form>
         </div>
+
+        {(inbound || []).length > 0 ? (
+          <div className="card">
+            <h2>Email replies — AI drafts ({inbound.length})</h2>
+            <div className="hint" style={{ marginBottom: 12 }}>
+              These arrived from vendors replying by email. The AI read the rates below — check/fix them, then Approve to add to the comparison.
+            </div>
+            {inbound.map((ib) => {
+              const ai = ib.ai_extracted || {};
+              const aiLines = ai.lines || [];
+              const rateFor = (itemId) => {
+                const l = aiLines.find((x) => x.item_id === itemId);
+                return l && l.rate != null ? l.rate : "";
+              };
+              return (
+                <div key={ib.id} className="card" style={{ background: "#fafafa" }}>
+                  <div className="muted" style={{ marginBottom: 8 }}>
+                    From <strong>{ib.from_email || "unknown"}</strong>
+                    {ib.subject ? ` · ${ib.subject}` : ""} · {new Date(ib.created_at).toLocaleString()}
+                  </div>
+                  <form action={approveInbound}>
+                    <input type="hidden" name="inbound_id" value={ib.id} />
+                    <input type="hidden" name="rfq_id" value={id} />
+                    <div className="row" style={{ marginBottom: 8 }}>
+                      <div>
+                        <label>Vendor name</label>
+                        <input name="vendor_name" defaultValue={ai.vendor_name || ib.from_email || ""} />
+                      </div>
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table>
+                        <thead><tr><th>#</th><th>Item</th><th className="num">Qty</th><th className="num">Rate (AI read)</th></tr></thead>
+                        <tbody>
+                          {items.map((it, idx) => (
+                            <tr key={it.id}>
+                              <td>{idx + 1}</td>
+                              <td>{it.description}</td>
+                              <td className="num">{Number(it.qty)}</td>
+                              <td className="num">
+                                <input type="hidden" name="item_id" value={it.id} />
+                                <input name="rate" type="number" step="any" defaultValue={rateFor(it.id)} style={{ width: 110, textAlign: "right" }} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <details style={{ margin: "10px 0" }}>
+                      <summary className="muted">Show original email</summary>
+                      <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, background: "#fff", border: "1px solid var(--line)", padding: 10, borderRadius: 8 }}>{ib.body_text}</pre>
+                    </details>
+                    <button className="btn" type="submit">Approve &rarr; add to comparison</button>
+                  </form>
+                  <form action={rejectInbound} style={{ marginTop: 6 }}>
+                    <input type="hidden" name="inbound_id" value={ib.id} />
+                    <input type="hidden" name="rfq_id" value={id} />
+                    <button className="btn danger sm" type="submit">Reject</button>
+                  </form>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
 
         <div className="card">
           <h2>Quotes &amp; comparison</h2>

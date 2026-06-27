@@ -170,7 +170,7 @@ export async function sendRfqEmail(formData) {
         Submit your quotation
       </a>
     </p>
-    <p style="color:#6b7280;font-size:13px">Or reply to this email with your rates. Reference: ${escapeHtml(rfqId)}</p>
+    <p style="color:#6b7280;font-size:13px">Please use the button above to submit your quotation online. Reference: ${escapeHtml(rfqId)}</p>
   </div>`;
 
   const apiKey = process.env.RESEND_API_KEY;
@@ -181,12 +181,15 @@ export async function sendRfqEmail(formData) {
   try {
     const { Resend } = await import("resend");
     const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
+    const replyDomain = process.env.REPLY_DOMAIN;
+    const sendOpts = {
       from,
       to,
       subject: `Request for Quotation: ${rfq.title} [Ref ${rfqId}]`,
       html,
-    });
+    };
+    if (replyDomain) sendOpts.replyTo = `rfq+${rfqId}@${replyDomain}`;
+    const { error } = await resend.emails.send(sendOpts);
     if (error) ok = false;
   } catch (e) {
     ok = false;
@@ -241,4 +244,41 @@ export async function submitQuote(formData) {
     if (e2) throw new Error(e2.message);
   }
   redirect("/quote/" + rfqId + "/thanks");
+}
+
+/* ---------------- Phase 2: approve / reject AI email drafts ---------------- */
+export async function approveInbound(formData) {
+  const id = formData.get("inbound_id");
+  const rfqId = formData.get("rfq_id");
+  const supabase = db();
+  const { data: ib } = await supabase.from("inbound_quotes").select("*").eq("id", id).single();
+  if (!ib) redirect(`/rfq/${rfqId}`);
+
+  const vendor = (formData.get("vendor_name") || ib.from_email || "Email vendor").trim();
+  const { data: q, error } = await supabase
+    .from("quotes")
+    .insert({ rfq_id: rfqId, vendor_name: vendor, vendor_contact: ib.from_email, notes: "Imported from email reply" })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+
+  const itemIds = formData.getAll("item_id");
+  const rates = formData.getAll("rate");
+  const lines = [];
+  for (let i = 0; i < itemIds.length; i++) {
+    const r = parseFloat(rates[i]);
+    if (isNaN(r)) continue;
+    lines.push({ quote_id: q.id, item_id: itemIds[i], rate: r });
+  }
+  if (lines.length) await supabase.from("quote_lines").insert(lines);
+  await supabase.from("inbound_quotes").update({ status: "approved" }).eq("id", id);
+  redirect(`/rfq/${rfqId}`);
+}
+
+export async function rejectInbound(formData) {
+  const id = formData.get("inbound_id");
+  const rfqId = formData.get("rfq_id");
+  const supabase = db();
+  await supabase.from("inbound_quotes").update({ status: "rejected" }).eq("id", id);
+  redirect(`/rfq/${rfqId}`);
 }
