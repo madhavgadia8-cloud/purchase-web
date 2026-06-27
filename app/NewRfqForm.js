@@ -3,16 +3,35 @@
 import { useState } from "react";
 import { createRfq } from "@/app/actions";
 
-export default function NewRfqForm() {
+export default function NewRfqForm({ products = [] }) {
   const [rows, setRows] = useState([{ d: "", q: "", u: "" }]);
 
   const update = (i, k, v) =>
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, [k]: v } : row)));
+
+  // When a description matches a saved product, auto-fill its unit.
+  const onDesc = (i, v) => {
+    const match = products.find((p) => p.name.toLowerCase() === v.trim().toLowerCase());
+    setRows((r) =>
+      r.map((row, idx) =>
+        idx === i ? { ...row, d: v, u: match && match.unit ? match.unit : row.u } : row
+      )
+    );
+  };
+
   const add = () => setRows((r) => [...r, { d: "", q: "", u: "" }]);
   const remove = (i) => setRows((r) => (r.length > 1 ? r.filter((_, idx) => idx !== i) : r));
 
   return (
     <form action={createRfq}>
+      <datalist id="product-list">
+        {products.map((p) => (
+          <option key={p.id} value={p.name}>
+            {p.code ? `${p.code} · ` : ""}{p.unit ? `${p.unit}` : ""}
+          </option>
+        ))}
+      </datalist>
+
       <div className="row">
         <div style={{ flex: 2 }}>
           <label>Title / reference</label>
@@ -29,14 +48,24 @@ export default function NewRfqForm() {
       </div>
 
       <h3>Line items</h3>
+      {products.length > 0 ? (
+        <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+          Start typing in Description to pick from your {products.length} saved product(s) — the unit fills in automatically.
+        </div>
+      ) : (
+        <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+          Tip: add products in the Products tab and they&apos;ll appear here as pick-from suggestions.
+        </div>
+      )}
       {rows.map((row, i) => (
         <div className="itemrow" key={i}>
           <input
             className="d"
             name="desc"
-            placeholder="Description"
+            list="product-list"
+            placeholder="Type or pick a product"
             value={row.d}
-            onChange={(e) => update(i, "d", e.target.value)}
+            onChange={(e) => onDesc(i, e.target.value)}
           />
           <input
             className="q"

@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RequirementsPage() {
   let rfqs = [];
+  let products = [];
   let dbError = null;
   try {
     const supabase = db();
@@ -16,6 +17,9 @@ export default async function RequirementsPage() {
       .order("created_at", { ascending: false });
     if (error) throw error;
     rfqs = data || [];
+    const { data: prods } = await supabase
+      .from("products").select("id,name,code,unit").order("name");
+    products = prods || [];
   } catch (e) {
     dbError = e.message;
   }
@@ -34,7 +38,7 @@ export default async function RequirementsPage() {
 
       <div className="card">
         <h2>Create a purchase requirement</h2>
-        <NewRfqForm />
+        <NewRfqForm products={products} />
       </div>
 
       <div className="card">
