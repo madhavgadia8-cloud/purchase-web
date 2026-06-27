@@ -56,38 +56,42 @@ export default async function PurchaseOrdersPage() {
   return (
     <AdminShell>
       <h1 className="page-title">Purchase Orders</h1>
-      <p className="page-sub">Every awarded vendor across your requirements. Open one to edit terms and print or save the PO.</p>
+      <p className="page-sub">Issue a custom PO, or generate one from quotations you received.</p>
 
-      {dbError ? (
-        <div className="card"><p className="muted">Could not load: {dbError}</p></div>
-      ) : (
-        <div className="card">
-          {entries.length === 0 ? (
-            <div className="empty">No POs yet. Add quotes to a requirement, then award the cheapest — a PO appears here.</div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table>
-                <thead>
-                  <tr><th>Requirement</th><th>Awarded vendor</th><th className="num">Items</th><th className="num">Amount</th><th></th></tr>
-                </thead>
-                <tbody>
-                  {entries.map((e, i) => (
-                    <tr key={i}>
-                      <td>{e.rfqTitle}</td>
-                      <td><strong>{e.vendor}</strong></td>
-                      <td className="num">{e.count}</td>
-                      <td className="num">{money(e.total)}</td>
-                      <td>
-                        <a className="btn ghost sm" href={`/rfq/${e.rfqId}/po/${e.quoteId}`} target="_blank" rel="noreferrer">Open PO</a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
+        <a className="btn" href="/purchase-orders/new" target="_blank" rel="noreferrer">+ Create custom PO</a>
+        <a className="btn ghost" href="/requirements">Generate from a requirement</a>
+      </div>
+
+      <h2 style={{ margin: "0 0 12px" }}>POs from received quotations</h2>
+      <div className="card">
+        {dbError ? (
+          <p className="muted">Could not load: {dbError}</p>
+        ) : entries.length === 0 ? (
+          <div className="empty">No POs from quotations yet. Add quotes to a requirement and award the cheapest — they appear here. Or use “Create custom PO” above.</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr><th>Requirement</th><th>Awarded vendor</th><th className="num">Items</th><th className="num">Amount</th><th></th></tr>
+              </thead>
+              <tbody>
+                {entries.map((e, i) => (
+                  <tr key={i}>
+                    <td>{e.rfqTitle}</td>
+                    <td><strong>{e.vendor}</strong></td>
+                    <td className="num">{e.count}</td>
+                    <td className="num">{money(e.total)}</td>
+                    <td>
+                      <a className="btn ghost sm" href={`/rfq/${e.rfqId}/po/${e.quoteId}`} target="_blank" rel="noreferrer">Open PO</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </AdminShell>
   );
 }

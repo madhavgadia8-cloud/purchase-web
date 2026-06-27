@@ -22,7 +22,7 @@ const AddBtn = ({ onClick, children }) => (
 export default function PoDocument({ poNo, date, supplier, reference, rows }) {
   const [poNumber, setPoNumber] = useState(poNo);
   const [poDate, setPoDate] = useState(date);
-  const [supName, setSupName] = useState(`M/s ${supplier.name}`);
+  const [supName, setSupName] = useState(supplier.name ? `M/s ${supplier.name}` : "");
   const [supAddr, setSupAddr] = useState(supplier.contact || "");
   const [ref, setRef] = useState(reference);
   const [gst, setGst] = useState("08AABFK3333R1Z0");
