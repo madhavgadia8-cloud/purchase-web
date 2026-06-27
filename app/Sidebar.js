@@ -10,6 +10,7 @@ const items = [
   { href: "/requirements", label: "Requirements (RFQ)", icon: "📋" },
   { href: "/products", label: "Products", icon: "📦" },
   { href: "/suppliers", label: "Suppliers", icon: "🏭" },
+  { href: "/purchase-orders", label: "Purchase Orders", icon: "🧾" },
 ];
 
 export default function Sidebar() {
