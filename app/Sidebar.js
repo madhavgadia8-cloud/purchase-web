@@ -18,7 +18,7 @@ export default function Sidebar() {
     href === "/" ? path === "/" : path.startsWith(href);
   return (
     <aside className="sidebar">
-      <div className="brand"><Logo size={34} /></div>
+      <div className="brand"><Logo size={48} /></div>
       <nav>
         {items.map((it) => (
           <Link key={it.href} href={it.href} className={isActive(it.href) ? "active" : ""}>
