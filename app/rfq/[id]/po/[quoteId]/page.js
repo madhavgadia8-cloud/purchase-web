@@ -1,6 +1,5 @@
-import { db, money } from "@/lib/db";
-import Logo from "@/app/Logo";
-import PrintButton from "@/app/rfq/[id]/po/[quoteId]/PrintButton";
+import { db } from "@/lib/db";
+import PoDocument from "@/app/rfq/[id]/po/[quoteId]/PoDocument";
 
 export const dynamic = "force-dynamic";
 
@@ -35,68 +34,22 @@ export default async function PurchaseOrder({ params }) {
   let total = 0;
   const rows = won.map((it, idx) => {
     const r = rate[quoteId][it.id];
-    const amt = r * Number(it.qty);
-    total += amt;
-    return { n: idx + 1, it, r, amt };
+    const amount = r * Number(it.qty);
+    total += amount;
+    return { id: it.id, n: idx + 1, description: it.description, qty: Number(it.qty), unit: it.unit || "", rate: r, amount };
   });
-  const poNo = `PO-${String(id).slice(0, 4)}-${String(quoteId).slice(0, 4)}`.toUpperCase();
-  const today = new Date().toLocaleDateString();
+  const year = new Date().getFullYear();
+  const poNo = `${year}-${(year + 1) % 100}/${String(quoteId).replace(/[^0-9]/g, "").slice(0, 3) || "001"}`;
+  const date = new Date().toLocaleDateString("en-GB");
 
   return (
-    <div className="wrap" style={{ maxWidth: 800 }}>
-      <div className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid var(--brand)", paddingBottom: 14, marginBottom: 16 }}>
-          <Logo size={48} />
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#374151" }}>PURCHASE ORDER</div>
-            <div className="muted">{poNo}</div>
-            <div className="muted">Date: {today}</div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, fontSize: 14 }}>
-          <div>
-            <div className="muted" style={{ textTransform: "uppercase", fontSize: 11 }}>Supplier</div>
-            <div style={{ fontWeight: 700 }}>{thisQuote.vendor_name}</div>
-            <div className="muted">{thisQuote.vendor_contact || ""}</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div className="muted" style={{ textTransform: "uppercase", fontSize: 11 }}>Reference</div>
-            <div>{rfq.title}</div>
-            {rfq.required_by ? <div className="muted">Required by {rfq.required_by}</div> : null}
-          </div>
-        </div>
-
-        <table>
-          <thead>
-            <tr><th>#</th><th>Description</th><th className="num">Qty</th><th>Unit</th><th className="num">Rate</th><th className="num">Amount</th></tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.it.id}>
-                <td>{row.n}</td>
-                <td>{row.it.description}</td>
-                <td className="num">{Number(row.it.qty)}</td>
-                <td>{row.it.unit}</td>
-                <td className="num">{money(row.r)}</td>
-                <td className="num">{money(row.amt)}</td>
-              </tr>
-            ))}
-            <tr>
-              <td colSpan={5} style={{ textAlign: "right", fontWeight: 700 }}>Total</td>
-              <td className="num" style={{ fontWeight: 700 }}>{money(total)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        {rfq.notes ? <p className="muted" style={{ marginTop: 12 }}>Notes: {rfq.notes}</p> : null}
-        <p className="muted" style={{ marginTop: 24, fontSize: 12 }}>
-          Kalpana Industries — Engineered Power Solutions. This PO is generated from the lowest-price award for the above requirement.
-        </p>
-        <div style={{ marginTop: 16 }} className="no-print">
-          <PrintButton />
-        </div>
-      </div>
-    </div>
+    <PoDocument
+      poNo={poNo}
+      date={date}
+      supplier={{ name: thisQuote.vendor_name, contact: thisQuote.vendor_contact }}
+      reference={rfq.title}
+      rows={rows}
+      total={total}
+    />
   );
 }
