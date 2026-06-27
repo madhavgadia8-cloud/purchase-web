@@ -117,3 +117,7 @@ td.num, th.num { text-align: right; }
 @media print {
   .po input, .po textarea { border: none !important; background: transparent !important; padding: 0 !important; resize: none; color: #000; }
 }
+@media print {
+  .po .card { border: none !important; box-shadow: none !important; }
+  @page { margin: 12mm; }
+}
