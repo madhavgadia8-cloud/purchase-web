@@ -1,9 +1,15 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])
+  );
+}
 
 export async function login(formData) {
   const pw = formData.get("password");
@@ -116,6 +122,76 @@ export async function deleteSupplier(formData) {
   await supabase.from("suppliers").delete().eq("id", id);
   revalidatePath("/suppliers");
   redirect("/suppliers");
+}
+
+/* ---------------- Send RFQ by email ---------------- */
+export async function sendRfqEmail(formData) {
+  const rfqId = formData.get("rfq_id");
+  const to = (formData.get("to") || "").trim();
+  if (!to) redirect(`/rfq/${rfqId}?sent=noemail`);
+
+  const supabase = db();
+  const { data: rfq } = await supabase.from("rfqs").select("*").eq("id", rfqId).single();
+  if (!rfq) redirect(`/rfq/${rfqId}?sent=err`);
+  const { data: items = [] } = await supabase
+    .from("rfq_items").select("*").eq("rfq_id", rfqId).order("sort");
+
+  const h = headers();
+  const proto = h.get("x-forwarded-proto") || "https";
+  const host = h.get("host");
+  const link = `${proto}://${host}/quote/${rfqId}`;
+
+  const rows = (items || []).map((it, i) =>
+    `<tr>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb">${i + 1}</td>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb">${escapeHtml(it.description)}</td>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right">${Number(it.qty)}</td>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb">${escapeHtml(it.unit || "")}</td>
+    </tr>`
+  ).join("");
+
+  const html = `
+  <div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;max-width:640px;margin:auto">
+    <h2 style="color:#F7941E;margin:0 0 4px">Request for Quotation</h2>
+    <p style="margin:0 0 14px;color:#6b7280">Kalpana Industries — Engineered Power Solutions</p>
+    <p><strong>${escapeHtml(rfq.title)}</strong>${rfq.required_by ? ` &middot; required by ${escapeHtml(rfq.required_by)}` : ""}</p>
+    ${rfq.notes ? `<p style="color:#374151">${escapeHtml(rfq.notes)}</p>` : ""}
+    <table style="border-collapse:collapse;width:100%;font-size:14px;margin:12px 0">
+      <thead><tr style="background:#f4f5f7">
+        <th style="padding:6px 10px;border:1px solid #e5e7eb;text-align:left">#</th>
+        <th style="padding:6px 10px;border:1px solid #e5e7eb;text-align:left">Description</th>
+        <th style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right">Qty</th>
+        <th style="padding:6px 10px;border:1px solid #e5e7eb;text-align:left">Unit</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="margin:18px 0">
+      <a href="${link}" style="background:#F7941E;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block">
+        Submit your quotation
+      </a>
+    </p>
+    <p style="color:#6b7280;font-size:13px">Or reply to this email with your rates. Reference: ${escapeHtml(rfqId)}</p>
+  </div>`;
+
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RFQ_FROM;
+  if (!apiKey || !from) redirect(`/rfq/${rfqId}?sent=config`);
+
+  let ok = true;
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from,
+      to,
+      subject: `Request for Quotation: ${rfq.title} [Ref ${rfqId}]`,
+      html,
+    });
+    if (error) ok = false;
+  } catch (e) {
+    ok = false;
+  }
+  redirect(`/rfq/${rfqId}?sent=${ok ? "1" : "fail"}&to=${encodeURIComponent(to)}`);
 }
 
 export async function submitQuote(formData) {

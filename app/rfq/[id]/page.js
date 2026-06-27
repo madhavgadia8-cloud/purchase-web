@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { db, money } from "@/lib/db";
-import { deleteRfq } from "@/app/actions";
+import { deleteRfq, sendRfqEmail } from "@/app/actions";
 import CopyLink from "@/app/rfq/[id]/CopyLink";
 import AdminShell from "@/app/AdminShell";
 
 export const dynamic = "force-dynamic";
 
-export default async function RfqDetail({ params }) {
+export default async function RfqDetail({ params, searchParams }) {
   const { id } = params;
   const supabase = db();
 
@@ -23,6 +23,8 @@ export default async function RfqDetail({ params }) {
     .from("rfq_items").select("*").eq("rfq_id", id).order("sort");
   const { data: quotes = [] } = await supabase
     .from("quotes").select("*").eq("rfq_id", id).order("submitted_at");
+  const { data: suppliers = [] } = await supabase
+    .from("suppliers").select("*").order("name");
 
   let lines = [];
   if (quotes.length) {
@@ -31,14 +33,12 @@ export default async function RfqDetail({ params }) {
     lines = data || [];
   }
 
-  // rate[quoteId][itemId]
   const rate = {};
   for (const l of lines) {
     (rate[l.quote_id] ||= {})[l.item_id] = Number(l.rate);
   }
 
-  // cheapest per item
-  const best = {}; // itemId -> {quoteId, rate}
+  const best = {};
   for (const it of items) {
     let b = null;
     for (const q of quotes) {
@@ -47,7 +47,6 @@ export default async function RfqDetail({ params }) {
     }
     best[it.id] = b;
   }
-  // totals
   const qTotal = {};
   for (const q of quotes) {
     let t = 0;
@@ -68,13 +67,31 @@ export default async function RfqDetail({ params }) {
   const saving = maxTotal && bestTotal ? maxTotal - bestTotal : 0;
   const minTotal = fullTotals.length ? Math.min(...fullTotals) : 0;
 
-  // vendor link
   const h = headers();
   const proto = h.get("x-forwarded-proto") || "https";
   const host = h.get("host");
   const vendorUrl = `${proto}://${host}/quote/${id}`;
 
   const quoteName = (qid) => quotes.find((q) => q.id === qid)?.vendor_name || "—";
+
+  const waText =
+    `Request for Quotation from Kalpana Industries\n\n` +
+    `${rfq.title}${rfq.required_by ? ` (required by ${rfq.required_by})` : ""}\n` +
+    `${items.length} item(s).\n\nPlease submit your quote here: ${vendorUrl}\nRef: ${id}`;
+  const waHref = (phone) =>
+    `https://wa.me/${String(phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(waText)}`;
+
+  const sent = searchParams?.sent;
+  const sentTo = searchParams?.to;
+  let sentBanner = null;
+  if (sent === "1")
+    sentBanner = <div className="hint" style={{ background: "#eaf6df", borderColor: "#bfe3a0", color: "#2f6b16" }}>✓ Email sent{sentTo ? ` to ${sentTo}` : ""}.</div>;
+  else if (sent === "config")
+    sentBanner = <div className="err">Email isn&apos;t configured yet. Add RESEND_API_KEY and RFQ_FROM in Vercel, then redeploy.</div>;
+  else if (sent === "fail")
+    sentBanner = <div className="err">Could not send. Check the address and your Resend/domain setup.</div>;
+  else if (sent === "noemail")
+    sentBanner = <div className="err">Enter an email address.</div>;
 
   return (
     <AdminShell>
@@ -95,6 +112,53 @@ export default async function RfqDetail({ params }) {
             list — never other vendors&apos; prices.
           </div>
           <CopyLink url={vendorUrl} />
+        </div>
+
+        <div className="card">
+          <h2>Send this RFQ to suppliers</h2>
+          {sentBanner}
+          <div className="hint" style={{ margin: "10px 0 14px" }}>
+            <strong>Email</strong> sends the RFQ with a quote link from your domain.{" "}
+            <strong>WhatsApp</strong> opens a pre-filled message you tap to send.
+          </div>
+          {suppliers.length === 0 ? (
+            <div className="muted">No suppliers saved yet. Add them in the Suppliers tab for one-click sending — or use the manual email below.</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table>
+                <thead><tr><th>Supplier</th><th>Email</th><th>Phone</th><th>Send</th></tr></thead>
+                <tbody>
+                  {suppliers.map((s) => (
+                    <tr key={s.id}>
+                      <td><strong>{s.name}</strong></td>
+                      <td>{s.email || "—"}</td>
+                      <td>{s.phone || "—"}</td>
+                      <td>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {s.email ? (
+                            <form action={sendRfqEmail}>
+                              <input type="hidden" name="rfq_id" value={id} />
+                              <input type="hidden" name="to" value={s.email} />
+                              <button className="btn sm" type="submit">✉ Email</button>
+                            </form>
+                          ) : null}
+                          {s.phone ? (
+                            <a className="btn ghost sm" href={waHref(s.phone)} target="_blank" rel="noreferrer">WhatsApp</a>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <h3>Or email any address</h3>
+          <form action={sendRfqEmail} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input type="hidden" name="rfq_id" value={id} />
+            <input name="to" type="email" placeholder="supplier@example.com" style={{ maxWidth: 280 }} />
+            <button className="btn sm" type="submit">Send email</button>
+          </form>
         </div>
 
         <div className="card">
