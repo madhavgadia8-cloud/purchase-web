@@ -26,7 +26,7 @@ export async function logout() {
 
 export async function createRfq(formData) {
   const title = (formData.get("title") || "").trim();
-  if (!title) redirect("/?e=title");
+  if (!title) redirect("/requirements?e=title");
   const required_by = formData.get("required_by") || null;
   const notes = (formData.get("notes") || "").trim() || null;
   const descs = formData.getAll("desc");
@@ -64,8 +64,58 @@ export async function deleteRfq(formData) {
   const id = formData.get("id");
   const supabase = db();
   await supabase.from("rfqs").delete().eq("id", id);
-  revalidatePath("/");
-  redirect("/");
+  revalidatePath("/requirements");
+  redirect("/requirements");
+}
+
+/* ---------------- Products ---------------- */
+export async function createProduct(formData) {
+  const name = (formData.get("name") || "").trim();
+  if (!name) redirect("/products?e=name");
+  const supabase = db();
+  const { error } = await supabase.from("products").insert({
+    name,
+    code: (formData.get("code") || "").trim() || null,
+    unit: (formData.get("unit") || "").trim() || null,
+    category: (formData.get("category") || "").trim() || null,
+    notes: (formData.get("notes") || "").trim() || null,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/products");
+  redirect("/products");
+}
+
+export async function deleteProduct(formData) {
+  const id = formData.get("id");
+  const supabase = db();
+  await supabase.from("products").delete().eq("id", id);
+  revalidatePath("/products");
+  redirect("/products");
+}
+
+/* ---------------- Suppliers ---------------- */
+export async function createSupplier(formData) {
+  const name = (formData.get("name") || "").trim();
+  if (!name) redirect("/suppliers?e=name");
+  const supabase = db();
+  const { error } = await supabase.from("suppliers").insert({
+    name,
+    contact_person: (formData.get("contact_person") || "").trim() || null,
+    email: (formData.get("email") || "").trim() || null,
+    phone: (formData.get("phone") || "").trim() || null,
+    category: (formData.get("category") || "").trim() || null,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/suppliers");
+  redirect("/suppliers");
+}
+
+export async function deleteSupplier(formData) {
+  const id = formData.get("id");
+  const supabase = db();
+  await supabase.from("suppliers").delete().eq("id", id);
+  revalidatePath("/suppliers");
+  redirect("/suppliers");
 }
 
 export async function submitQuote(formData) {

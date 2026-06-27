@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { db, money } from "@/lib/db";
 import { deleteRfq } from "@/app/actions";
 import CopyLink from "@/app/rfq/[id]/CopyLink";
+import AdminShell from "@/app/AdminShell";
 
 export const dynamic = "force-dynamic";
 
@@ -76,12 +77,11 @@ export default async function RfqDetail({ params }) {
   const quoteName = (qid) => quotes.find((q) => q.id === qid)?.vendor_name || "—";
 
   return (
-    <>
-      <div className="topbar">
-        <h1>📦 Purchase Manager</h1>
-        <div className="right"><Link href="/">← All requirements</Link></div>
+    <AdminShell>
+      <div style={{ marginBottom: 14 }}>
+        <Link href="/requirements" className="muted">← All requirements</Link>
       </div>
-      <div className="wrap">
+      <div>
         <div className="card">
           <h2>{rfq.title}</h2>
           <div className="muted">
@@ -237,6 +237,6 @@ export default async function RfqDetail({ params }) {
           </form>
         </div>
       </div>
-    </>
+    </AdminShell>
   );
 }
