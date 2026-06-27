@@ -3,8 +3,31 @@ import { extractQuote } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
 
+// Pull an email address (or comma list) out of the many shapes inbound
+// providers use: string, {address}, {email}, {text}, {value:[{address}]}, arrays.
+function addrOf(x) {
+  if (!x) return "";
+  if (typeof x === "string") return x;
+  if (Array.isArray(x)) return x.map(addrOf).filter(Boolean).join(",");
+  if (x.address) return x.address;
+  if (x.email) return x.email;
+  if (x.value) return addrOf(x.value);
+  if (x.text) return x.text;
+  return "";
+}
+
+
+// Best-effort: turn a raw MIME email into readable text for the AI.
+function rawToText(raw) {
+  let s = String(raw || "");
+  s = s.replace(/=\r?\n/g, "");
+  s = s.replace(/=([0-9A-Fa-f]{2})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+  s = s.replace(/<[^>]+>/g, " ");
+  s = s.replace(/[ \t]+/g, " ");
+  return s;
+}
+
 export async function POST(req) {
-  // simple shared-secret check (set INBOUND_SECRET and append ?key=... to the webhook URL)
   const url = new URL(req.url);
   const secret = process.env.INBOUND_SECRET;
   if (secret && url.searchParams.get("key") !== secret) {
@@ -19,18 +42,15 @@ export async function POST(req) {
   }
   const d = (body && body.data) || body || {};
 
-  const from =
-    (d.from && (d.from.address || d.from.email || d.from)) || d.sender || "";
-  const toRaw = d.to || d.recipient || "";
-  const to = Array.isArray(toRaw)
-    ? toRaw.map((x) => x.address || x.email || x).join(",")
-    : String(toRaw);
-  const subject = d.subject || "";
+  const from = addrOf(d.from || d.sender || d.From);
+  const to = addrOf(d.to || d.recipient || d.To);
+  const subject = d.subject || d.Subject || "";
   const text =
     d.text ||
     d.plain ||
     d["body-plain"] ||
     (d.html ? String(d.html).replace(/<[^>]+>/g, " ") : "") ||
+    (d.raw ? rawToText(d.raw) : "") ||
     "";
 
   // identify RFQ: "+<id>@" in the to-address, or "Ref/Reference <id>" in subject/body
@@ -38,7 +58,7 @@ export async function POST(req) {
   const plus = String(to).match(/\+([0-9a-fA-F-]{8,})@/);
   if (plus) rfqId = plus[1];
   if (!rfqId) {
-    const m = (subject + " " + text).match(/Ref(?:erence)?[:\s\[]+([0-9a-fA-F-]{8,})/i);
+    const m = (String(subject) + " " + String(text)).match(/Ref(?:erence)?[:\s\[]+([0-9a-fA-F-]{8,})/i);
     if (m) rfqId = m[1];
   }
 
@@ -52,7 +72,7 @@ export async function POST(req) {
 
   let ai = null;
   if (rfqId && items.length) {
-    ai = await extractQuote({ items, emailText: text, fromEmail: from });
+    ai = await extractQuote({ items, emailText: String(text), fromEmail: from });
   }
 
   await supabase.from("inbound_quotes").insert({

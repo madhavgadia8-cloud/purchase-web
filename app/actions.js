@@ -181,14 +181,16 @@ export async function sendRfqEmail(formData) {
   try {
     const { Resend } = await import("resend");
     const resend = new Resend(apiKey);
-    const replyDomain = process.env.REPLY_DOMAIN;
     const sendOpts = {
       from,
       to,
       subject: `Request for Quotation: ${rfq.title} [Ref ${rfqId}]`,
       html,
     };
-    if (replyDomain) sendOpts.replyTo = `rfq+${rfqId}@${replyDomain}`;
+    const replyTo =
+      process.env.REPLY_TO_ADDRESS ||
+      (process.env.REPLY_DOMAIN ? `rfq+${rfqId}@${process.env.REPLY_DOMAIN}` : null);
+    if (replyTo) sendOpts.replyTo = replyTo;
     const { error } = await resend.emails.send(sendOpts);
     if (error) ok = false;
   } catch (e) {
