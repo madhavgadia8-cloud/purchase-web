@@ -48,6 +48,15 @@ export default async function VendorQuote({ params, searchParams }) {
                 <input name="vendor_contact" />
               </div>
             </div>
+            <div style={{ marginTop: 12 }}>
+              <label>Notes / message (specifications, brand, delivery, validity…)</label>
+              <textarea name="notes" rows={3} placeholder="Add any description, specifications or remarks for the buyer (optional)" />
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <label>Attach spec or your quotation (PDF / image / Excel — optional, up to ~12 MB)</label>
+              <input name="attachment" type="file"
+                     accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp" />
+            </div>
           </div>
 
           <div className="card">

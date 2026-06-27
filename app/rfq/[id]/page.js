@@ -282,18 +282,26 @@ export default async function RfqDetail({ params, searchParams }) {
           {quotes.length === 0 ? (
             <div className="muted">No submissions yet.</div>
           ) : (
-            <table>
-              <thead><tr><th>Vendor</th><th>Contact</th><th>Submitted</th></tr></thead>
-              <tbody>
-                {quotes.map((q) => (
-                  <tr key={q.id}>
-                    <td>{q.vendor_name}</td>
-                    <td>{q.vendor_contact || "—"}</td>
-                    <td>{new Date(q.submitted_at).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ overflowX: "auto" }}>
+              <table>
+                <thead><tr><th>Vendor</th><th>Contact</th><th>Notes / spec</th><th>File</th><th>Submitted</th></tr></thead>
+                <tbody>
+                  {quotes.map((q) => (
+                    <tr key={q.id}>
+                      <td>{q.vendor_name}</td>
+                      <td>{q.vendor_contact || "—"}</td>
+                      <td style={{ maxWidth: 320, whiteSpace: "pre-wrap" }}>{q.notes || "—"}</td>
+                      <td>
+                        {q.attachment_url ? (
+                          <a className="btn ghost sm" href={q.attachment_url} target="_blank" rel="noreferrer">View file</a>
+                        ) : "—"}
+                      </td>
+                      <td>{new Date(q.submitted_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
           <form action={deleteRfq} style={{ marginTop: 16 }}>
             <input type="hidden" name="id" value={id} />

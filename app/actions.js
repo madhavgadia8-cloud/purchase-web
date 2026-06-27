@@ -198,15 +198,35 @@ export async function submitQuote(formData) {
   const rfqId = formData.get("rfq_id");
   const vendor = (formData.get("vendor_name") || "").trim();
   const contact = (formData.get("vendor_contact") || "").trim();
+  const notes = (formData.get("notes") || "").trim() || null;
   if (!vendor) redirect("/quote/" + rfqId + "?e=name");
 
   const supabase = db();
   const { data: q, error } = await supabase
     .from("quotes")
-    .insert({ rfq_id: rfqId, vendor_name: vendor, vendor_contact: contact })
+    .insert({ rfq_id: rfqId, vendor_name: vendor, vendor_contact: contact, notes })
     .select()
     .single();
   if (error) throw new Error(error.message);
+
+  // optional file upload (spec / vendor's own quotation)
+  const file = formData.get("attachment");
+  if (file && typeof file === "object" && file.size > 0) {
+    try {
+      const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = rfqId + "/" + q.id + "." + (ext || "bin");
+      const bytes = Buffer.from(await file.arrayBuffer());
+      const { error: upErr } = await supabase.storage
+        .from("quotes")
+        .upload(path, bytes, { contentType: file.type || "application/octet-stream", upsert: true });
+      if (!upErr) {
+        const { data: pub } = supabase.storage.from("quotes").getPublicUrl(path);
+        await supabase.from("quotes").update({ attachment_url: pub.publicUrl }).eq("id", q.id);
+      }
+    } catch (e) {
+      // ignore upload failure; quote still saved
+    }
+  }
 
   const itemIds = formData.getAll("item_id");
   const rates = formData.getAll("rate");
