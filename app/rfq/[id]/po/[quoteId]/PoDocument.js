@@ -63,13 +63,12 @@ export default function PoDocument({ poNo, date, supplier, reference, rows }) {
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {/* Letterhead */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "18px 22px", borderBottom: "3px solid var(--brand)" }}>
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            <Logo size={54} showText={false} />
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "#F7941E", letterSpacing: ".04em" }}>KALPANA INDUSTRIES</div>
-              <div style={{ fontSize: 12, color: "#4b5563" }}>Manufacturers: Distribution &amp; Power Transformers</div>
-              <div style={{ fontSize: 12, color: "#4b5563", marginTop: 4 }}>Works: F-11, Industrial Area, Jhunjhunu-333 001 (Raj.)</div>
-              <div style={{ fontSize: 12, color: "#4b5563" }}>Phone: 9414080577</div>
+          <div>
+            <Logo size={72} />
+            <div style={{ fontSize: 12, color: "#4b5563", marginTop: 8, lineHeight: 1.55 }}>
+              <div>Manufacturers: Distribution &amp; Power Transformers</div>
+              <div>Works: F-11, Industrial Area, Jhunjhunu-333 001 (Raj.)</div>
+              <div>Phone: 9414080577</div>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
@@ -169,12 +168,7 @@ export default function PoDocument({ poNo, date, supplier, reference, rows }) {
           ))}
           <AddBtn onClick={() => setRemarks((a) => [...a, ""])}>+ Add remark</AddBtn>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 48, gap: 24 }}>
-            <div style={{ fontSize: 12, color: "#6b7280" }}>
-              <div style={{ border: "1px dashed #cbd5e1", borderRadius: 6, width: 150, height: 70, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}>
-                Seal &amp; Stamp
-              </div>
-            </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 56 }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontWeight: 700, marginBottom: 52 }}>For KALPANA INDUSTRIES</div>
               <div style={{ borderTop: "1px solid #6b7280", paddingTop: 4, fontSize: 12, color: "#374151", minWidth: 230 }}>Authorised Signatory</div>
