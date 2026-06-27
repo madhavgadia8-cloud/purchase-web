@@ -108,3 +108,8 @@ td.num, th.num { text-align: right; }
 .itemrow input.d { flex: 3; }
 .itemrow input.q { flex: 1; }
 .itemrow input.u { flex: 1; }
+@media print {
+  .no-print { display: none !important; }
+  .sidebar, .topbar { display: none !important; }
+  body { background: #fff; }
+}

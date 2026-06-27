@@ -284,3 +284,30 @@ export async function rejectInbound(formData) {
   await supabase.from("inbound_quotes").update({ status: "rejected" }).eq("id", id);
   redirect(`/rfq/${rfqId}`);
 }
+
+
+/* ---------------- Manual quote entry (phone / WhatsApp / email) ---------------- */
+export async function addManualQuote(formData) {
+  const rfqId = formData.get("rfq_id");
+  const vendor = (formData.get("vendor_name") || "").trim();
+  if (!vendor) redirect(`/rfq/${rfqId}?mq=name`);
+  const contact = (formData.get("vendor_contact") || "").trim();
+  const notes = (formData.get("notes") || "").trim() || null;
+  const supabase = db();
+  const { data: q, error } = await supabase
+    .from("quotes")
+    .insert({ rfq_id: rfqId, vendor_name: vendor, vendor_contact: contact, notes })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  const itemIds = formData.getAll("item_id");
+  const rates = formData.getAll("rate");
+  const lines = [];
+  for (let i = 0; i < itemIds.length; i++) {
+    const r = parseFloat(rates[i]);
+    if (isNaN(r)) continue;
+    lines.push({ quote_id: q.id, item_id: itemIds[i], rate: r });
+  }
+  if (lines.length) await supabase.from("quote_lines").insert(lines);
+  redirect(`/rfq/${rfqId}`);
+}

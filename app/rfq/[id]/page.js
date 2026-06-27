@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { db, money } from "@/lib/db";
-import { deleteRfq, sendRfqEmail, approveInbound, rejectInbound } from "@/app/actions";
+import { deleteRfq, sendRfqEmail, approveInbound, rejectInbound, addManualQuote } from "@/app/actions";
 import CopyLink from "@/app/rfq/[id]/CopyLink";
 import AdminShell from "@/app/AdminShell";
 
@@ -68,6 +68,7 @@ export default async function RfqDetail({ params, searchParams }) {
   const maxTotal = fullTotals.length ? Math.max(...fullTotals) : 0;
   const saving = maxTotal && bestTotal ? maxTotal - bestTotal : 0;
   const minTotal = fullTotals.length ? Math.min(...fullTotals) : 0;
+  const winningQuoteIds = [...new Set(items.map((it) => best[it.id]?.quoteId).filter(Boolean))];
 
   const h = headers();
   const proto = h.get("x-forwarded-proto") || "https";
@@ -160,6 +161,41 @@ export default async function RfqDetail({ params, searchParams }) {
             <input type="hidden" name="rfq_id" value={id} />
             <input name="to" type="email" placeholder="supplier@example.com" style={{ maxWidth: 280 }} />
             <button className="btn sm" type="submit">Send email</button>
+          </form>
+        </div>
+
+        <div className="card">
+          <h2>Add a quote manually</h2>
+          <div className="hint" style={{ marginBottom: 12 }}>
+            Got a price by phone, WhatsApp or email? Enter it here so it joins the comparison.
+          </div>
+          <form action={addManualQuote}>
+            <input type="hidden" name="rfq_id" value={id} />
+            <div className="row">
+              <div><label>Vendor name *</label><input name="vendor_name" required /></div>
+              <div><label>Contact (optional)</label><input name="vendor_contact" /></div>
+            </div>
+            <div style={{ marginTop: 10 }}><label>Notes (optional)</label><input name="notes" /></div>
+            <div style={{ overflowX: "auto", marginTop: 10 }}>
+              <table>
+                <thead><tr><th>#</th><th>Item</th><th className="num">Qty</th><th>Unit</th><th className="num">Rate</th></tr></thead>
+                <tbody>
+                  {items.map((it, idx) => (
+                    <tr key={it.id}>
+                      <td>{idx + 1}</td>
+                      <td>{it.description}</td>
+                      <td className="num">{Number(it.qty)}</td>
+                      <td>{it.unit}</td>
+                      <td className="num">
+                        <input type="hidden" name="item_id" value={it.id} />
+                        <input name="rate" type="number" step="any" style={{ width: 110, textAlign: "right" }} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button className="btn" type="submit" style={{ marginTop: 12 }}>Add quote</button>
           </form>
         </div>
 
@@ -338,6 +374,18 @@ export default async function RfqDetail({ params, searchParams }) {
                   </tr>
                 </tbody>
               </table>
+
+              <h3>Purchase Orders</h3>
+              <div className="muted" style={{ marginBottom: 8 }}>
+                One PO per winning vendor (lowest-price items). Opens a printable page — use Print / Save as PDF.
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {winningQuoteIds.map((qid) => (
+                  <a key={qid} className="btn ghost sm" href={`/rfq/${id}/po/${qid}`} target="_blank" rel="noreferrer">
+                    PO — {quoteName(qid)}
+                  </a>
+                ))}
+              </div>
             </>
           )}
         </div>
