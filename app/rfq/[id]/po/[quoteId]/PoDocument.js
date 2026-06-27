@@ -168,14 +168,14 @@ export default function PoDocument({ poNo, date, supplier, reference, rows }) {
           ))}
           <AddBtn onClick={() => setRemarks((a) => [...a, ""])}>+ Add remark</AddBtn>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 56 }}>
+          <div className="po-sign" style={{ display: "flex", justifyContent: "flex-end", marginTop: 56 }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontWeight: 700, marginBottom: 52 }}>For KALPANA INDUSTRIES</div>
+              <div className="po-signgap" style={{ fontWeight: 700, marginBottom: 52 }}>For KALPANA INDUSTRIES</div>
               <div style={{ borderTop: "1px solid #6b7280", paddingTop: 4, fontSize: 12, color: "#374151", minWidth: 230 }}>Authorised Signatory</div>
             </div>
           </div>
 
-          <div style={{ marginTop: 28, borderTop: "2px solid var(--brand)", paddingTop: 8, textAlign: "center", fontSize: 11, color: "#6b7280", lineHeight: 1.6 }}>
+          <div className="po-footer" style={{ marginTop: 28, borderTop: "2px solid var(--brand)", paddingTop: 8, textAlign: "center", fontSize: 11, color: "#6b7280", lineHeight: 1.6 }}>
             <div style={{ fontWeight: 700, color: "#374151" }}>KALPANA INDUSTRIES &mdash; Engineered Power Solutions</div>
             <div>Works: F-11, Industrial Area, Jhunjhunu-333 001 (Raj.)&nbsp; | &nbsp;Phone: 9414080577&nbsp; | &nbsp;GST: 08AABFK3333R1Z0</div>
             <div>Subject to Jhunjhunu (Raj.) Jurisdiction. This is a computer-generated purchase order.</div>

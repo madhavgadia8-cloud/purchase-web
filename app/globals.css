@@ -117,7 +117,20 @@ td.num, th.num { text-align: right; }
 @media print {
   .po input, .po textarea { border: none !important; background: transparent !important; padding: 0 !important; resize: none; color: #000; }
 }
+
+/* ---- Purchase Order: compress to fit one page on print ---- */
 @media print {
-  .po .card { border: none !important; box-shadow: none !important; }
-  @page { margin: 12mm; }
+  @page { size: A4; margin: 10mm; }
+  body { background: #fff; }
+  .sidebar, .topbar, .no-print { display: none !important; }
+  .po { max-width: none !important; padding: 0 !important; }
+  .po .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
+  .po, .po * { font-size: 10.5px !important; line-height: 1.35 !important; }
+  .po h2 { font-size: 12px !important; margin: 6px 0 3px !important; }
+  .po h3 { font-size: 11.5px !important; margin: 8px 0 3px !important; }
+  .po table th, .po table td { padding: 2px 6px !important; }
+  .po input, .po textarea { padding: 0 1px !important; }
+  .po .po-sign { margin-top: 16px !important; }
+  .po .po-signgap { margin-bottom: 34px !important; }
+  .po .po-footer { margin-top: 12px !important; padding-top: 5px !important; }
 }
