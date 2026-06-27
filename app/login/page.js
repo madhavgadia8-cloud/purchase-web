@@ -1,12 +1,16 @@
 import { login } from "@/app/actions";
+import Logo from "@/app/Logo";
 
 export default function LoginPage({ searchParams }) {
   const err = searchParams?.e;
   return (
     <div className="wrap">
       <div className="card center">
-        <h2>📦 Purchase Manager</h2>
-        <p className="muted">Admin sign-in</p>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+          <Logo size={44} />
+        </div>
+        <h2 style={{ textAlign: "center" }}>Purchase Manager</h2>
+        <p className="muted" style={{ textAlign: "center" }}>Admin sign-in</p>
         <form action={login}>
           <label>Password</label>
           <input type="password" name="password" autoFocus />

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/actions";
+import Logo from "@/app/Logo";
 
 const items = [
   { href: "/", label: "Dashboard", icon: "📊" },
@@ -17,7 +18,7 @@ export default function Sidebar() {
     href === "/" ? path === "/" : path.startsWith(href);
   return (
     <aside className="sidebar">
-      <div className="brand">📦 Purchase Manager</div>
+      <div className="brand"><Logo size={34} /></div>
       <nav>
         {items.map((it) => (
           <Link key={it.href} href={it.href} className={isActive(it.href) ? "active" : ""}>

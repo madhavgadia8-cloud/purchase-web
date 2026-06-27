@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { submitQuote } from "@/app/actions";
+import Logo from "@/app/Logo";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function VendorQuote({ params, searchParams }) {
 
   return (
     <>
-      <div className="topbar"><h1>📦 Request for Quotation</h1></div>
+      <div className="topbar"><Logo size={34} /><h1 style={{ marginLeft: 6 }}>Request for Quotation</h1></div>
       <div className="wrap">
         <div className="card">
           <h2>{rfq.title}</h2>
