@@ -12,6 +12,7 @@ import {
   setSession,
   clearSession,
 } from "@/lib/auth";
+import { can, roleLabel, ALL_PERMS } from "@/lib/perms";
 
 function escapeHtml(s) {
   return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
@@ -19,11 +20,11 @@ function escapeHtml(s) {
   );
 }
 
-// Require an admin for write actions. Returns the user, or redirects viewers away.
-async function requireAdmin() {
+// Require a specific permission for write actions. Returns the user, or redirects.
+async function requirePermission(perm) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "admin") redirect("/?denied=1");
+  if (!can(user, perm)) redirect("/?denied=1");
   return user;
 }
 
@@ -33,7 +34,6 @@ export async function login(formData) {
   const pw = formData.get("password") || "";
   const supabase = db();
 
-  // 1) Named app user
   if (username) {
     const { data: u } = await supabase
       .from("app_users")
@@ -48,7 +48,6 @@ export async function login(formData) {
     }
   }
 
-  // 2) Built-in admin via ADMIN_PASSWORD (username blank or "admin")
   if ((!username || username.toLowerCase() === "admin") && pw && pw === process.env.ADMIN_PASSWORD) {
     setSession("env");
     await logActivity("Admin", "Signed in", "Built-in admin");
@@ -67,7 +66,7 @@ export async function logout() {
 
 /* ---------------- Requirements (RFQ) ---------------- */
 export async function createRfq(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("rfq");
   const title = (formData.get("title") || "").trim();
   if (!title) redirect("/requirements?e=title");
   const required_by = formData.get("required_by") || null;
@@ -105,7 +104,7 @@ export async function createRfq(formData) {
 }
 
 export async function deleteRfq(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("delete");
   const id = formData.get("id");
   const supabase = db();
   const { data: rfq } = await supabase.from("rfqs").select("title").eq("id", id).maybeSingle();
@@ -117,7 +116,7 @@ export async function deleteRfq(formData) {
 
 /* ---------------- Products ---------------- */
 export async function createProduct(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("products");
   const name = (formData.get("name") || "").trim();
   if (!name) redirect("/products?e=name");
   const supabase = db();
@@ -135,7 +134,7 @@ export async function createProduct(formData) {
 }
 
 export async function deleteProduct(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("delete");
   const id = formData.get("id");
   const supabase = db();
   const { data: p } = await supabase.from("products").select("name").eq("id", id).maybeSingle();
@@ -147,7 +146,7 @@ export async function deleteProduct(formData) {
 
 /* ---------------- Suppliers ---------------- */
 export async function createSupplier(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("suppliers");
   const name = (formData.get("name") || "").trim();
   if (!name) redirect("/suppliers?e=name");
   const supabase = db();
@@ -165,7 +164,7 @@ export async function createSupplier(formData) {
 }
 
 export async function updateSupplier(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("suppliers");
   const id = formData.get("id");
   const name = (formData.get("name") || "").trim();
   if (!id || !name) redirect("/suppliers?e=name");
@@ -187,7 +186,7 @@ export async function updateSupplier(formData) {
 }
 
 export async function deleteSupplier(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("delete");
   const id = formData.get("id");
   const supabase = db();
   const { data: s } = await supabase.from("suppliers").select("name").eq("id", id).maybeSingle();
@@ -199,7 +198,7 @@ export async function deleteSupplier(formData) {
 
 /* ---------------- Quotes ---------------- */
 export async function deleteQuote(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("delete");
   const quoteId = formData.get("quote_id");
   const rfqId = formData.get("rfq_id");
   const supabase = db();
@@ -213,7 +212,7 @@ export async function deleteQuote(formData) {
 
 /* ---------------- Send RFQ by email ---------------- */
 export async function sendRfqEmail(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("send");
   const rfqId = formData.get("rfq_id");
   const to = (formData.get("to") || "").trim();
   if (!to) redirect(`/rfq/${rfqId}?sent=noemail`);
@@ -304,7 +303,6 @@ export async function submitQuote(formData) {
     .single();
   if (error) throw new Error(error.message);
 
-  // optional file upload (spec / vendor's own quotation)
   const file = formData.get("attachment");
   if (file && typeof file === "object" && file.size > 0) {
     try {
@@ -341,7 +339,7 @@ export async function submitQuote(formData) {
 
 /* ---------------- Phase 2: approve / reject AI email drafts ---------------- */
 export async function approveInbound(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("quotes");
   const id = formData.get("inbound_id");
   const rfqId = formData.get("rfq_id");
   const supabase = db();
@@ -371,7 +369,7 @@ export async function approveInbound(formData) {
 }
 
 export async function rejectInbound(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("quotes");
   const id = formData.get("inbound_id");
   const rfqId = formData.get("rfq_id");
   const supabase = db();
@@ -380,9 +378,9 @@ export async function rejectInbound(formData) {
   redirect(`/rfq/${rfqId}`);
 }
 
-/* ---------------- Manual quote entry (phone / WhatsApp / email) ---------------- */
+/* ---------------- Manual quote entry ---------------- */
 export async function addManualQuote(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("quotes");
   const rfqId = formData.get("rfq_id");
   const vendor = (formData.get("vendor_name") || "").trim();
   if (!vendor) redirect(`/rfq/${rfqId}?mq=name`);
@@ -408,39 +406,49 @@ export async function addManualQuote(formData) {
   redirect(`/rfq/${rfqId}`);
 }
 
-/* ---------------- User management (admin only) ---------------- */
+/* ---------------- User management (needs 'users' permission) ---------------- */
+function readPerms(formData) {
+  return formData.getAll("perm").map((p) => String(p)).filter((p) => ALL_PERMS.includes(p));
+}
+
 export async function createUser(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("users");
   const username = (formData.get("username") || "").trim();
   const password = formData.get("password") || "";
-  const role = (formData.get("role") || "viewer").trim() === "admin" ? "admin" : "viewer";
+  const perms = readPerms(formData);
   if (!username || !password) redirect("/users?e=missing");
   const supabase = db();
   const { error } = await supabase.from("app_users").insert({
     username,
     password_hash: hashPassword(password),
-    role,
+    role: roleLabel(perms).toLowerCase(),
     active: true,
+    permissions: perms,
   });
   if (error) {
     redirect("/users?e=dup");
   }
-  await logActivity(me.name, "Created user", `${username} (${role})`);
+  await logActivity(me.name, "Created user", `${username} (${roleLabel(perms)})`);
   redirect("/users");
 }
 
-export async function updateUserRole(formData) {
-  const me = await requireAdmin();
+export async function updateUserPermissions(formData) {
+  const me = await requirePermission("users");
   const id = formData.get("id");
-  const role = (formData.get("role") || "viewer").trim() === "admin" ? "admin" : "viewer";
+  const perms = readPerms(formData);
   const supabase = db();
-  const { data: u } = await supabase.from("app_users").update({ role }).eq("id", id).select().maybeSingle();
-  await logActivity(me.name, "Changed user role", `${u?.username || id} → ${role}`);
+  const { data: u } = await supabase
+    .from("app_users")
+    .update({ permissions: perms, role: roleLabel(perms).toLowerCase() })
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+  await logActivity(me.name, "Updated user rights", `${u?.username || id} → ${roleLabel(perms)}`);
   redirect("/users");
 }
 
 export async function resetUserPassword(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("users");
   const id = formData.get("id");
   const password = formData.get("password") || "";
   if (!password) redirect("/users?e=missing");
@@ -456,7 +464,7 @@ export async function resetUserPassword(formData) {
 }
 
 export async function deleteUser(formData) {
-  const me = await requireAdmin();
+  const me = await requirePermission("users");
   const id = formData.get("id");
   const supabase = db();
   const { data: u } = await supabase.from("app_users").select("username").eq("id", id).maybeSingle();

@@ -7,7 +7,8 @@ import Logo from "@/app/Logo";
 
 export default function Sidebar({ user }) {
   const path = usePathname();
-  const isAdmin = user?.role === "admin";
+  const perms = user?.permissions || [];
+  const canUsers = perms.includes("users");
   const isActive = (href) =>
     href === "/" ? path === "/" : path.startsWith(href);
 
@@ -19,7 +20,7 @@ export default function Sidebar({ user }) {
     { href: "/purchase-orders", label: "Purchase Orders", icon: "🧾" },
     { href: "/activity", label: "Activity log", icon: "🕑" },
   ];
-  if (isAdmin) items.push({ href: "/users", label: "Users", icon: "👤" });
+  if (canUsers) items.push({ href: "/users", label: "Users", icon: "👤" });
 
   return (
     <aside className="sidebar">
@@ -34,7 +35,7 @@ export default function Sidebar({ user }) {
       </nav>
       <div className="spacer" />
       {user ? (
-        <div style={{ padding: "8px 12px", fontSize: 13, color: "var(--muted, #6b7280)" }}>
+        <div style={{ padding: "8px 12px", fontSize: 13, color: "#6b7280" }}>
           <div style={{ fontWeight: 600, color: "#374151" }}>{user.name}</div>
           <div style={{ textTransform: "capitalize" }}>{user.role}</div>
         </div>
