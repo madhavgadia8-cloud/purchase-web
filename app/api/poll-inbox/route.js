@@ -24,6 +24,7 @@ export async function GET(req) {
     secure: true,
     auth: { user, pass },
     logger: false,
+    tls: { rejectUnauthorized: false },
   });
 
   let processed = 0;
@@ -71,7 +72,11 @@ export async function GET(req) {
       lock.release();
     }
   } catch (e) {
-    note = "error: " + e.message;
+    note =
+      "error: " + (e.responseText || e.message || String(e)) +
+      (e.authenticationFailed ? " [auth failed - check IMAP_PASS]" : "") +
+      (e.serverResponseCode ? " [" + e.serverResponseCode + "]" : "") +
+      (e.code ? " {" + e.code + "}" : "");
   } finally {
     try { await client.logout(); } catch {}
   }
