@@ -10,6 +10,32 @@ function money(n) {
 let _seq = 0;
 const uid = () => `${++_seq}_${Math.random().toString(36).slice(2, 6)}`;
 
+function inWords(num) {
+  num = Math.round((Number(num) || 0) * 100) / 100;
+  const rupees = Math.floor(num);
+  const paise = Math.round((num - rupees) * 100);
+  const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const two = (n) => (n < 20 ? a[n] : b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : ""));
+  const three = (n) => (n >= 100 ? a[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " : "") : "") + (n % 100 ? two(n % 100) : "");
+  function words(n) {
+    if (n === 0) return "Zero";
+    let str = "";
+    const crore = Math.floor(n / 10000000); n %= 10000000;
+    const lakh = Math.floor(n / 100000); n %= 100000;
+    const thou = Math.floor(n / 1000); n %= 1000;
+    if (crore) str += words(crore) + " Crore ";
+    if (lakh) str += two(lakh) + " Lakh ";
+    if (thou) str += two(thou) + " Thousand ";
+    if (n) str += three(n);
+    return str.trim();
+  }
+  let res = "Rupees " + words(rupees);
+  if (paise) res += " and " + two(paise) + " Paise";
+  return res + " Only";
+}
+
+
 const X = ({ onClick }) => (
   <button type="button" className="no-print" onClick={onClick}
     title="Remove"
@@ -43,6 +69,7 @@ export default function PoDocument({ poNo, date, supplier, reference, rows }) {
     { id: uid(), label: "Delivery", value: "" },
     { id: uid(), label: "Dispatch Through", value: "By Road Transport at Jhunjhunu (Raj.)" },
   ]);
+  const [gstPct, setGstPct] = useState("18");
   const [remarks, setRemarks] = useState([
     "Bills should accompany the test certificate for the material supplied.",
     "Invoice complete in all respects as per GST rules to enable us to take GST credit.",
@@ -51,6 +78,8 @@ export default function PoDocument({ poNo, date, supplier, reference, rows }) {
 
   const amt = (it) => (parseFloat(it.qty) || 0) * (parseFloat(it.rate) || 0);
   const total = items.reduce((s, it) => s + amt(it), 0);
+  const gstAmt = total * (parseFloat(gstPct) || 0) / 100;
+  const grand = total + gstAmt;
 
   const setItem = (id, k, v) => setItems((a) => a.map((it) => (it.id === id ? { ...it, [k]: v } : it)));
   const setTerm = (id, k, v) => setTerms((a) => a.map((t) => (t.id === id ? { ...t, [k]: v } : t)));
@@ -136,6 +165,27 @@ export default function PoDocument({ poNo, date, supplier, reference, rows }) {
             </tbody>
           </table>
           <AddBtn onClick={() => setItems((a) => [...a, { id: uid(), description: "", delivery: "", qty: "", unit: "", rate: "" }])}>+ Add item</AddBtn>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+            <table style={{ width: "auto" }}>
+              <tbody>
+                <tr><td style={{ textAlign: "right" }}>Sub Total</td><td className="num" style={{ minWidth: 130 }}>{money(total)}</td></tr>
+                <tr>
+                  <td style={{ textAlign: "right" }}>
+                    GST @ <input value={gstPct} onChange={(e) => setGstPct(e.target.value)} style={{ width: 48, textAlign: "right" }} /> %
+                  </td>
+                  <td className="num">{money(gstAmt)}</td>
+                </tr>
+                <tr style={{ background: "var(--soft)" }}>
+                  <td style={{ textAlign: "right", fontWeight: 800 }}>GRAND TOTAL</td>
+                  <td className="num" style={{ fontWeight: 800 }}>{money(grand)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12 }}>
+            <strong>Amount in words:</strong> {inWords(grand)}
+          </div>
           <p style={{ fontSize: 11, color: "#6b7280", marginTop: 8 }}>
             References of the purchase order should be indicated in all the Bill / Dispatch advice etc. relating to this order.
           </p>
