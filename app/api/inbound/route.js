@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { extractQuote } from "@/lib/ai";
+import { extractQuote, getAiDebug } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +77,14 @@ export async function POST(req) {
   let ai = null;
   if (rfqId && items.length) {
     ai = await extractQuote({ items, emailText: String(text), fromEmail: from });
+  }
+
+  const debug = url.searchParams.get("debug") === "1";
+  if (debug) {
+    return new Response(
+      JSON.stringify({ rfqId, itemCount: items.length, ai, aiDebug: getAiDebug(), from, subject, textPreview: String(text).slice(0, 200) }, null, 2),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
   }
 
   await supabase.from("inbound_quotes").insert({
