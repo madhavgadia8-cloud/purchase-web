@@ -11,7 +11,12 @@ import {
   verifyPassword,
   setSession,
   clearSession,
+  generateOtp,
+  setOtpSession,
+  getOtpSession,
+  clearOtpSession,
 } from "@/lib/auth";
+import { sendOtpCode } from "@/lib/sms";
 import { can, roleLabel, ALL_PERMS } from "@/lib/perms";
 
 function escapeHtml(s) {
@@ -42,6 +47,27 @@ export async function login(formData) {
       .eq("active", true)
       .maybeSingle();
     if (u && verifyPassword(pw, u.password_hash)) {
+      if (u.phone || u.email) {
+        const code = generateOtp();
+        await supabase
+          .from("app_users")
+          .update({
+            otp_hash: hashPassword(code),
+            otp_expires: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+          })
+          .eq("id", u.id);
+        const sent = await sendOtpCode({ phone: u.phone, email: u.email, code });
+        if (sent.channel === "none") {
+          // No SMS/email channel configured yet — don't lock the user out.
+          await supabase.from("app_users").update({ otp_hash: null, otp_expires: null }).eq("id", u.id);
+          setSession(u.id);
+          await logActivity(u.username, "Signed in", "OTP channel not set — password only");
+          redirect("/");
+        }
+        setOtpSession(u.id);
+        await logActivity(u.username, "OTP sent", `via ${sent.channel}`);
+        redirect("/login/otp?ch=" + sent.channel);
+      }
       setSession(u.id);
       await logActivity(u.username, "Signed in", `Role: ${u.role}`);
       redirect("/");
@@ -62,6 +88,47 @@ export async function logout() {
   await logActivity(user?.name || "—", "Signed out", null);
   clearSession();
   redirect("/login");
+}
+
+export async function verifyOtp(formData) {
+  const uid = getOtpSession();
+  if (!uid) redirect("/login");
+  const code = (formData.get("code") || "").trim();
+  const supabase = db();
+  const { data: u } = await supabase
+    .from("app_users")
+    .select("*")
+    .eq("id", uid)
+    .eq("active", true)
+    .maybeSingle();
+  if (!u || !u.otp_hash || !u.otp_expires) redirect("/login");
+  const expired = new Date(u.otp_expires).getTime() < Date.now();
+  if (expired || !verifyPassword(code, u.otp_hash)) {
+    redirect("/login/otp?e=1");
+  }
+  await supabase.from("app_users").update({ otp_hash: null, otp_expires: null }).eq("id", u.id);
+  clearOtpSession();
+  setSession(u.id);
+  await logActivity(u.username, "Signed in", "OTP verified");
+  redirect("/");
+}
+
+export async function resendOtp() {
+  const uid = getOtpSession();
+  if (!uid) redirect("/login");
+  const supabase = db();
+  const { data: u } = await supabase.from("app_users").select("*").eq("id", uid).maybeSingle();
+  if (!u) redirect("/login");
+  const code = generateOtp();
+  await supabase
+    .from("app_users")
+    .update({
+      otp_hash: hashPassword(code),
+      otp_expires: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    })
+    .eq("id", u.id);
+  const sent = await sendOtpCode({ phone: u.phone, email: u.email, code });
+  redirect("/login/otp?ch=" + sent.channel + "&resent=1");
 }
 
 /* ---------------- Requirements (RFQ) ---------------- */
@@ -416,6 +483,8 @@ export async function createUser(formData) {
   const username = (formData.get("username") || "").trim();
   const password = formData.get("password") || "";
   const perms = readPerms(formData);
+  const phone = (formData.get("phone") || "").trim() || null;
+  const email = (formData.get("email") || "").trim() || null;
   if (!username || !password) redirect("/users?e=missing");
   const supabase = db();
   const { error } = await supabase.from("app_users").insert({
@@ -424,6 +493,8 @@ export async function createUser(formData) {
     role: roleLabel(perms).toLowerCase(),
     active: true,
     permissions: perms,
+    phone,
+    email,
   });
   if (error) {
     redirect("/users?e=dup");
@@ -460,6 +531,22 @@ export async function resetUserPassword(formData) {
     .select()
     .maybeSingle();
   await logActivity(me.name, "Reset password", u?.username || id);
+  redirect("/users");
+}
+
+export async function updateUserContact(formData) {
+  const me = await requirePermission("users");
+  const id = formData.get("id");
+  const phone = (formData.get("phone") || "").trim() || null;
+  const email = (formData.get("email") || "").trim() || null;
+  const supabase = db();
+  const { data: u } = await supabase
+    .from("app_users")
+    .update({ phone, email })
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+  await logActivity(me.name, "Updated user contact", u?.username || id);
   redirect("/users");
 }
 

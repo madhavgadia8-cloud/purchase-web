@@ -17,7 +17,7 @@ export default async function UsersPage({ searchParams }) {
     const supabase = db();
     const { data, error } = await supabase
       .from("app_users")
-      .select("id,username,role,active,permissions,created_at")
+      .select("id,username,role,active,permissions,phone,email,created_at")
       .order("created_at", { ascending: true });
     if (error) throw error;
     users = (data || []).map((u) => ({
