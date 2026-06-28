@@ -3,8 +3,6 @@ import { extractQuote } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
 
-// Pull an email address (or comma list) out of the many shapes inbound
-// providers use: string, {address}, {email}, {text}, {value:[{address}]}, arrays.
 function addrOf(x) {
   if (!x) return "";
   if (typeof x === "string") return x;
@@ -15,9 +13,11 @@ function addrOf(x) {
   if (x.text) return x.text;
   return "";
 }
-
-
-// Best-effort: turn a raw MIME email into readable text for the AI.
+function hget(h, name) {
+  if (!h || typeof h !== "object") return "";
+  const k = Object.keys(h).find((x) => x.toLowerCase() === name.toLowerCase());
+  return k ? h[k] : "";
+}
 function rawToText(raw) {
   let s = String(raw || "");
   s = s.replace(/=\r?\n/g, "");
@@ -34,26 +34,32 @@ export async function POST(req) {
     return new Response("unauthorized", { status: 401 });
   }
 
-  let body;
+  // Accept JSON or form-encoded (CloudMailin can send either)
+  let d = {};
+  const ctype = req.headers.get("content-type") || "";
   try {
-    body = await req.json();
-  } catch {
-    return new Response("bad request", { status: 400 });
+    if (ctype.includes("application/json")) {
+      d = await req.json();
+    } else {
+      const form = await req.formData();
+      d = {};
+      for (const [k, v] of form.entries()) d[k] = typeof v === "string" ? v : (v && v.name) || "";
+    }
+  } catch (e) {
+    try { d = await req.json(); } catch { d = {}; }
   }
-  const d = (body && body.data) || body || {};
+  d = (d && d.data) || d || {};
 
-  const from = addrOf(d.from || d.sender || d.From);
-  const to = addrOf(d.to || d.recipient || d.To);
-  const subject = d.subject || d.Subject || "";
+  const headers = d.headers || {};
+  const envelope = d.envelope || {};
+  const from = addrOf(d.from || envelope.from || hget(headers, "from") || d.sender || d["envelope[from]"] || d["headers[from]"]);
+  const to = addrOf(d.to || envelope.to || hget(headers, "to") || d.recipient || d["envelope[to]"] || d["headers[to]"]);
+  const subject = d.subject || hget(headers, "subject") || d["headers[subject]"] || "";
   const text =
-    d.text ||
-    d.plain ||
-    d["body-plain"] ||
+    d.plain || d.text || d["body-plain"] || d.reply_plain ||
     (d.html ? String(d.html).replace(/<[^>]+>/g, " ") : "") ||
-    (d.raw ? rawToText(d.raw) : "") ||
-    "";
+    (d.raw ? rawToText(d.raw) : "") || "";
 
-  // identify RFQ: "+<id>@" in the to-address, or "Ref/Reference <id>" in subject/body
   let rfqId = null;
   const plus = String(to).match(/\+([0-9a-fA-F-]{8,})@/);
   if (plus) rfqId = plus[1];
@@ -65,11 +71,9 @@ export async function POST(req) {
   const supabase = db();
   let items = [];
   if (rfqId) {
-    const { data } = await supabase
-      .from("rfq_items").select("*").eq("rfq_id", rfqId).order("sort");
+    const { data } = await supabase.from("rfq_items").select("*").eq("rfq_id", rfqId).order("sort");
     items = data || [];
   }
-
   let ai = null;
   if (rfqId && items.length) {
     ai = await extractQuote({ items, emailText: String(text), fromEmail: from });
