@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import AdminShell from "@/app/AdminShell";
 import SupplierForm from "@/app/SupplierForm";
-import { deleteSupplier } from "@/app/actions";
+import SuppliersTable from "@/app/SuppliersTable";
 
 export const dynamic = "force-dynamic";
 
@@ -39,32 +39,7 @@ export default async function SuppliersPage({ searchParams }) {
         ) : suppliers.length === 0 ? (
           <div className="empty">No suppliers yet. Add your first one above.</div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Category</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {suppliers.map((s) => (
-                  <tr key={s.id}>
-                    <td><strong>{s.name}</strong></td>
-                    <td>{s.contact_person || "—"}</td>
-                    <td>{s.email || "—"}</td>
-                    <td>{s.phone || "—"}</td>
-                    <td>{s.category || "—"}</td>
-                    <td>
-                      <form action={deleteSupplier}>
-                        <input type="hidden" name="id" value={s.id} />
-                        <button className="btn danger sm" type="submit">Delete</button>
-                      </form>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SuppliersTable suppliers={suppliers} />
         )}
       </div>
     </AdminShell>

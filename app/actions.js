@@ -116,6 +116,26 @@ export async function createSupplier(formData) {
   redirect("/suppliers");
 }
 
+export async function updateSupplier(formData) {
+  const id = formData.get("id");
+  const name = (formData.get("name") || "").trim();
+  if (!id || !name) redirect("/suppliers?e=name");
+  const supabase = db();
+  const { error } = await supabase
+    .from("suppliers")
+    .update({
+      name,
+      contact_person: (formData.get("contact_person") || "").trim() || null,
+      email: (formData.get("email") || "").trim() || null,
+      phone: (formData.get("phone") || "").trim() || null,
+      category: (formData.get("category") || "").trim() || null,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/suppliers");
+  redirect("/suppliers");
+}
+
 export async function deleteSupplier(formData) {
   const id = formData.get("id");
   const supabase = db();
