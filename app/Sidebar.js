@@ -18,6 +18,7 @@ export default function Sidebar({ user }) {
     { href: "/products", label: "Products", icon: "📦" },
     { href: "/suppliers", label: "Suppliers", icon: "🏭" },
     { href: "/purchase-orders", label: "Purchase Orders", icon: "🧾" },
+    { href: "/reports", label: "Reports", icon: "📈" },
     { href: "/activity", label: "Activity log", icon: "🕑" },
   ];
   if (canUsers) items.push({ href: "/users", label: "Users", icon: "👤" });
