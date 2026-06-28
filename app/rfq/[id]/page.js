@@ -22,8 +22,9 @@ export default async function RfqDetail({ params, searchParams }) {
   }
   const { data: items = [] } = await supabase
     .from("rfq_items").select("*").eq("rfq_id", id).order("sort");
-  const { data: quotes = [] } = await supabase
+  const { data: quotesData, error: quotesError } = await supabase
     .from("quotes").select("*").eq("rfq_id", id).order("submitted_at");
+  const quotes = quotesData || [];
   const { data: suppliers = [] } = await supabase
     .from("suppliers").select("*").order("name");
   const { data: inbound = [] } = await supabase
@@ -102,6 +103,11 @@ export default async function RfqDetail({ params, searchParams }) {
       <div style={{ marginBottom: 14 }}>
         <Link href="/requirements" className="muted">← All requirements</Link>
       </div>
+      {searchParams?.debug === "1" ? (
+        <pre style={{ background: "#fff3cd", border: "1px solid #ffe69c", padding: 10, borderRadius: 8, fontSize: 12, whiteSpace: "pre-wrap" }}>
+          {JSON.stringify({ id, quotesCount: quotes.length, quotesError, sample: quotes.slice(0, 3).map((q) => ({ id: q.id, vendor: q.vendor_name })) }, null, 2)}
+        </pre>
+      ) : null}
       <div>
         <div className="card">
           <h2>{rfq.title}</h2>
