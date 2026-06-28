@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { db, money } from "@/lib/db";
+import { db, money, fmtDate } from "@/lib/db";
 import { deleteRfq, sendRfqEmail, approveInbound, rejectInbound, addManualQuote, deleteQuote } from "@/app/actions";
 import CopyLink from "@/app/rfq/[id]/CopyLink";
 import AdminShell from "@/app/AdminShell";
@@ -22,9 +22,8 @@ export default async function RfqDetail({ params, searchParams }) {
   }
   const { data: items = [] } = await supabase
     .from("rfq_items").select("*").eq("rfq_id", id).order("sort");
-  const { data: quotesData, error: quotesError } = await supabase
+  const { data: quotes = [] } = await supabase
     .from("quotes").select("*").eq("rfq_id", id).order("submitted_at");
-  const quotes = quotesData || [];
   const { data: suppliers = [] } = await supabase
     .from("suppliers").select("*").order("name");
   const { data: inbound = [] } = await supabase
@@ -103,11 +102,6 @@ export default async function RfqDetail({ params, searchParams }) {
       <div style={{ marginBottom: 14 }}>
         <Link href="/requirements" className="muted">← All requirements</Link>
       </div>
-      {searchParams?.debug === "1" ? (
-        <pre style={{ background: "#fff3cd", border: "1px solid #ffe69c", padding: 10, borderRadius: 8, fontSize: 12, whiteSpace: "pre-wrap" }}>
-          {JSON.stringify({ id, quotesCount: quotes.length, quotesError, sample: quotes.slice(0, 3).map((q) => ({ id: q.id, vendor: q.vendor_name })) }, null, 2)}
-        </pre>
-      ) : null}
       <div>
         <div className="card">
           <h2>{rfq.title}</h2>
@@ -223,7 +217,7 @@ export default async function RfqDetail({ params, searchParams }) {
                 <div key={ib.id} className="card" style={{ background: "#fafafa" }}>
                   <div className="muted" style={{ marginBottom: 8 }}>
                     From <strong>{ib.from_email || "unknown"}</strong>
-                    {ib.subject ? ` · ${ib.subject}` : ""} · {new Date(ib.created_at).toLocaleString()}
+                    {ib.subject ? ` · ${ib.subject}` : ""} · {fmtDate(ib.created_at, true)}
                   </div>
                   <form action={approveInbound}>
                     <input type="hidden" name="inbound_id" value={ib.id} />
@@ -416,7 +410,7 @@ export default async function RfqDetail({ params, searchParams }) {
                           <a className="btn ghost sm" href={q.attachment_url} target="_blank" rel="noreferrer">View file</a>
                         ) : "—"}
                       </td>
-                      <td>{new Date(q.submitted_at).toLocaleString()}</td>
+                      <td>{fmtDate(q.submitted_at, true)}</td>
                       <td>
                         <form action={deleteQuote}>
                           <input type="hidden" name="quote_id" value={q.id} />

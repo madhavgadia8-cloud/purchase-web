@@ -5,18 +5,22 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/app/actions";
 import Logo from "@/app/Logo";
 
-const items = [
-  { href: "/", label: "Dashboard", icon: "📊" },
-  { href: "/requirements", label: "Requirements (RFQ)", icon: "📋" },
-  { href: "/products", label: "Products", icon: "📦" },
-  { href: "/suppliers", label: "Suppliers", icon: "🏭" },
-  { href: "/purchase-orders", label: "Purchase Orders", icon: "🧾" },
-];
-
-export default function Sidebar() {
+export default function Sidebar({ user }) {
   const path = usePathname();
+  const isAdmin = user?.role === "admin";
   const isActive = (href) =>
     href === "/" ? path === "/" : path.startsWith(href);
+
+  const items = [
+    { href: "/", label: "Dashboard", icon: "📊" },
+    { href: "/requirements", label: "Requirements (RFQ)", icon: "📋" },
+    { href: "/products", label: "Products", icon: "📦" },
+    { href: "/suppliers", label: "Suppliers", icon: "🏭" },
+    { href: "/purchase-orders", label: "Purchase Orders", icon: "🧾" },
+    { href: "/activity", label: "Activity log", icon: "🕑" },
+  ];
+  if (isAdmin) items.push({ href: "/users", label: "Users", icon: "👤" });
+
   return (
     <aside className="sidebar">
       <div className="brand"><Logo size={48} /></div>
@@ -29,6 +33,12 @@ export default function Sidebar() {
         ))}
       </nav>
       <div className="spacer" />
+      {user ? (
+        <div style={{ padding: "8px 12px", fontSize: 13, color: "var(--muted, #6b7280)" }}>
+          <div style={{ fontWeight: 600, color: "#374151" }}>{user.name}</div>
+          <div style={{ textTransform: "capitalize" }}>{user.role}</div>
+        </div>
+      ) : null}
       <form className="signout" action={logout}>
         <button type="submit">Sign out</button>
       </form>

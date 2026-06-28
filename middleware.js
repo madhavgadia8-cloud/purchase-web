@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 // Protect admin routes. Public: /login, /quote/* (vendor form), Next assets.
 export function middleware(req) {
   const { pathname } = req.nextUrl;
-  const authed = req.cookies.get("pm_auth")?.value === "ok";
+  const authed = !!req.cookies.get("pm_auth")?.value;
   const isPublic =
     pathname === "/login" ||
     pathname.startsWith("/quote") ||

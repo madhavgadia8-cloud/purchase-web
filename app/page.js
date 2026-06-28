@@ -9,7 +9,8 @@ async function counts(supabase, table) {
   return count || 0;
 }
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }) {
+  const denied = searchParams?.denied === "1";
   let dbError = null;
   let rfqCount = 0, quoteCount = 0, productCount = 0, supplierCount = 0, openCount = 0;
   let recent = [];
@@ -43,6 +44,12 @@ export default async function Dashboard() {
     <AdminShell>
       <h1 className="page-title">Dashboard</h1>
       <p className="page-sub">Overview of your purchasing activity.</p>
+
+      {denied ? (
+        <div className="err" style={{ marginBottom: 14 }}>
+          That action needs an Admin account. Your role is read-only (Viewer).
+        </div>
+      ) : null}
 
       {dbError ? (
         <div className="card">

@@ -10,11 +10,13 @@ export default function LoginPage({ searchParams }) {
           <Logo size={44} />
         </div>
         <h2 style={{ textAlign: "center" }}>Purchase Manager</h2>
-        <p className="muted" style={{ textAlign: "center" }}>Admin sign-in</p>
+        <p className="muted" style={{ textAlign: "center" }}>Sign in to continue</p>
         <form action={login}>
-          <label>Password</label>
-          <input type="password" name="password" autoFocus />
-          {err ? <div className="err">Wrong password, try again.</div> : null}
+          <label>Username</label>
+          <input name="username" autoFocus placeholder="your username" autoComplete="username" />
+          <label style={{ marginTop: 10, display: "block" }}>Password</label>
+          <input type="password" name="password" autoComplete="current-password" />
+          {err ? <div className="err">Wrong username or password, try again.</div> : null}
           <button className="btn" type="submit" style={{ marginTop: 12, width: "100%" }}>
             Sign in
           </button>

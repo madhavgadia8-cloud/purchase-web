@@ -4,6 +4,14 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import {
+  getCurrentUser,
+  logActivity,
+  hashPassword,
+  verifyPassword,
+  setSession,
+  clearSession,
+} from "@/lib/auth";
 
 function escapeHtml(s) {
   return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
@@ -11,26 +19,55 @@ function escapeHtml(s) {
   );
 }
 
+// Require an admin for write actions. Returns the user, or redirects viewers away.
+async function requireAdmin() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "admin") redirect("/?denied=1");
+  return user;
+}
+
+/* ---------------- Auth ---------------- */
 export async function login(formData) {
-  const pw = formData.get("password");
-  if (pw && pw === process.env.ADMIN_PASSWORD) {
-    cookies().set("pm_auth", "ok", {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
+  const username = (formData.get("username") || "").trim();
+  const pw = formData.get("password") || "";
+  const supabase = db();
+
+  // 1) Named app user
+  if (username) {
+    const { data: u } = await supabase
+      .from("app_users")
+      .select("*")
+      .eq("username", username)
+      .eq("active", true)
+      .maybeSingle();
+    if (u && verifyPassword(pw, u.password_hash)) {
+      setSession(u.id);
+      await logActivity(u.username, "Signed in", `Role: ${u.role}`);
+      redirect("/");
+    }
+  }
+
+  // 2) Built-in admin via ADMIN_PASSWORD (username blank or "admin")
+  if ((!username || username.toLowerCase() === "admin") && pw && pw === process.env.ADMIN_PASSWORD) {
+    setSession("env");
+    await logActivity("Admin", "Signed in", "Built-in admin");
     redirect("/");
   }
+
   redirect("/login?e=1");
 }
 
 export async function logout() {
-  cookies().delete("pm_auth");
+  const user = await getCurrentUser();
+  await logActivity(user?.name || "—", "Signed out", null);
+  clearSession();
   redirect("/login");
 }
 
+/* ---------------- Requirements (RFQ) ---------------- */
 export async function createRfq(formData) {
+  const me = await requireAdmin();
   const title = (formData.get("title") || "").trim();
   if (!title) redirect("/requirements?e=title");
   const required_by = formData.get("required_by") || null;
@@ -63,29 +100,24 @@ export async function createRfq(formData) {
     const { error: e2 } = await supabase.from("rfq_items").insert(items);
     if (e2) throw new Error(e2.message);
   }
+  await logActivity(me.name, "Created requirement", `${title} (${items.length} item(s))`);
   redirect("/rfq/" + rfq.id);
 }
 
 export async function deleteRfq(formData) {
+  const me = await requireAdmin();
   const id = formData.get("id");
   const supabase = db();
+  const { data: rfq } = await supabase.from("rfqs").select("title").eq("id", id).maybeSingle();
   await supabase.from("rfqs").delete().eq("id", id);
+  await logActivity(me.name, "Deleted requirement", rfq?.title || id);
   revalidatePath("/requirements");
   redirect("/requirements");
 }
 
-export async function deleteQuote(formData) {
-  const quoteId = formData.get("quote_id");
-  const rfqId = formData.get("rfq_id");
-  const supabase = db();
-  await supabase.from("quote_lines").delete().eq("quote_id", quoteId);
-  await supabase.from("quotes").delete().eq("id", quoteId);
-  revalidatePath(`/rfq/${rfqId}`);
-  redirect(`/rfq/${rfqId}`);
-}
-
 /* ---------------- Products ---------------- */
 export async function createProduct(formData) {
+  const me = await requireAdmin();
   const name = (formData.get("name") || "").trim();
   if (!name) redirect("/products?e=name");
   const supabase = db();
@@ -97,20 +129,25 @@ export async function createProduct(formData) {
     notes: (formData.get("notes") || "").trim() || null,
   });
   if (error) throw new Error(error.message);
+  await logActivity(me.name, "Added product", name);
   revalidatePath("/products");
   redirect("/products");
 }
 
 export async function deleteProduct(formData) {
+  const me = await requireAdmin();
   const id = formData.get("id");
   const supabase = db();
+  const { data: p } = await supabase.from("products").select("name").eq("id", id).maybeSingle();
   await supabase.from("products").delete().eq("id", id);
+  await logActivity(me.name, "Deleted product", p?.name || id);
   revalidatePath("/products");
   redirect("/products");
 }
 
 /* ---------------- Suppliers ---------------- */
 export async function createSupplier(formData) {
+  const me = await requireAdmin();
   const name = (formData.get("name") || "").trim();
   if (!name) redirect("/suppliers?e=name");
   const supabase = db();
@@ -122,11 +159,13 @@ export async function createSupplier(formData) {
     category: (formData.get("category") || "").trim() || null,
   });
   if (error) throw new Error(error.message);
+  await logActivity(me.name, "Added supplier", name);
   revalidatePath("/suppliers");
   redirect("/suppliers");
 }
 
 export async function updateSupplier(formData) {
+  const me = await requireAdmin();
   const id = formData.get("id");
   const name = (formData.get("name") || "").trim();
   if (!id || !name) redirect("/suppliers?e=name");
@@ -142,20 +181,39 @@ export async function updateSupplier(formData) {
     })
     .eq("id", id);
   if (error) throw new Error(error.message);
+  await logActivity(me.name, "Edited supplier", name);
   revalidatePath("/suppliers");
   redirect("/suppliers");
 }
 
 export async function deleteSupplier(formData) {
+  const me = await requireAdmin();
   const id = formData.get("id");
   const supabase = db();
+  const { data: s } = await supabase.from("suppliers").select("name").eq("id", id).maybeSingle();
   await supabase.from("suppliers").delete().eq("id", id);
+  await logActivity(me.name, "Deleted supplier", s?.name || id);
   revalidatePath("/suppliers");
   redirect("/suppliers");
 }
 
+/* ---------------- Quotes ---------------- */
+export async function deleteQuote(formData) {
+  const me = await requireAdmin();
+  const quoteId = formData.get("quote_id");
+  const rfqId = formData.get("rfq_id");
+  const supabase = db();
+  const { data: q } = await supabase.from("quotes").select("vendor_name").eq("id", quoteId).maybeSingle();
+  await supabase.from("quote_lines").delete().eq("quote_id", quoteId);
+  await supabase.from("quotes").delete().eq("id", quoteId);
+  await logActivity(me.name, "Deleted quote", q?.vendor_name || quoteId);
+  revalidatePath(`/rfq/${rfqId}`);
+  redirect(`/rfq/${rfqId}`);
+}
+
 /* ---------------- Send RFQ by email ---------------- */
 export async function sendRfqEmail(formData) {
+  const me = await requireAdmin();
   const rfqId = formData.get("rfq_id");
   const to = (formData.get("to") || "").trim();
   if (!to) redirect(`/rfq/${rfqId}?sent=noemail`);
@@ -226,9 +284,11 @@ export async function sendRfqEmail(formData) {
   } catch (e) {
     ok = false;
   }
+  if (ok) await logActivity(me.name, "Sent RFQ email", `${rfq.title} → ${to}`);
   redirect(`/rfq/${rfqId}?sent=${ok ? "1" : "fail"}&to=${encodeURIComponent(to)}`);
 }
 
+/* ---------------- Public vendor quote submission ---------------- */
 export async function submitQuote(formData) {
   const rfqId = formData.get("rfq_id");
   const vendor = (formData.get("vendor_name") || "").trim();
@@ -275,11 +335,13 @@ export async function submitQuote(formData) {
     const { error: e2 } = await supabase.from("quote_lines").insert(lines);
     if (e2) throw new Error(e2.message);
   }
+  await logActivity(`Vendor: ${vendor}`, "Submitted quote (link)", null);
   redirect("/quote/" + rfqId + "/thanks");
 }
 
 /* ---------------- Phase 2: approve / reject AI email drafts ---------------- */
 export async function approveInbound(formData) {
+  const me = await requireAdmin();
   const id = formData.get("inbound_id");
   const rfqId = formData.get("rfq_id");
   const supabase = db();
@@ -304,20 +366,23 @@ export async function approveInbound(formData) {
   }
   if (lines.length) await supabase.from("quote_lines").insert(lines);
   await supabase.from("inbound_quotes").update({ status: "approved" }).eq("id", id);
+  await logActivity(me.name, "Approved email quote", vendor);
   redirect(`/rfq/${rfqId}`);
 }
 
 export async function rejectInbound(formData) {
+  const me = await requireAdmin();
   const id = formData.get("inbound_id");
   const rfqId = formData.get("rfq_id");
   const supabase = db();
   await supabase.from("inbound_quotes").update({ status: "rejected" }).eq("id", id);
+  await logActivity(me.name, "Rejected email quote", null);
   redirect(`/rfq/${rfqId}`);
 }
 
-
 /* ---------------- Manual quote entry (phone / WhatsApp / email) ---------------- */
 export async function addManualQuote(formData) {
+  const me = await requireAdmin();
   const rfqId = formData.get("rfq_id");
   const vendor = (formData.get("vendor_name") || "").trim();
   if (!vendor) redirect(`/rfq/${rfqId}?mq=name`);
@@ -339,5 +404,63 @@ export async function addManualQuote(formData) {
     lines.push({ quote_id: q.id, item_id: itemIds[i], rate: r });
   }
   if (lines.length) await supabase.from("quote_lines").insert(lines);
+  await logActivity(me.name, "Added manual quote", vendor);
   redirect(`/rfq/${rfqId}`);
+}
+
+/* ---------------- User management (admin only) ---------------- */
+export async function createUser(formData) {
+  const me = await requireAdmin();
+  const username = (formData.get("username") || "").trim();
+  const password = formData.get("password") || "";
+  const role = (formData.get("role") || "viewer").trim() === "admin" ? "admin" : "viewer";
+  if (!username || !password) redirect("/users?e=missing");
+  const supabase = db();
+  const { error } = await supabase.from("app_users").insert({
+    username,
+    password_hash: hashPassword(password),
+    role,
+    active: true,
+  });
+  if (error) {
+    redirect("/users?e=dup");
+  }
+  await logActivity(me.name, "Created user", `${username} (${role})`);
+  redirect("/users");
+}
+
+export async function updateUserRole(formData) {
+  const me = await requireAdmin();
+  const id = formData.get("id");
+  const role = (formData.get("role") || "viewer").trim() === "admin" ? "admin" : "viewer";
+  const supabase = db();
+  const { data: u } = await supabase.from("app_users").update({ role }).eq("id", id).select().maybeSingle();
+  await logActivity(me.name, "Changed user role", `${u?.username || id} → ${role}`);
+  redirect("/users");
+}
+
+export async function resetUserPassword(formData) {
+  const me = await requireAdmin();
+  const id = formData.get("id");
+  const password = formData.get("password") || "";
+  if (!password) redirect("/users?e=missing");
+  const supabase = db();
+  const { data: u } = await supabase
+    .from("app_users")
+    .update({ password_hash: hashPassword(password) })
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+  await logActivity(me.name, "Reset password", u?.username || id);
+  redirect("/users");
+}
+
+export async function deleteUser(formData) {
+  const me = await requireAdmin();
+  const id = formData.get("id");
+  const supabase = db();
+  const { data: u } = await supabase.from("app_users").select("username").eq("id", id).maybeSingle();
+  await supabase.from("app_users").delete().eq("id", id);
+  await logActivity(me.name, "Deleted user", u?.username || id);
+  redirect("/users");
 }
