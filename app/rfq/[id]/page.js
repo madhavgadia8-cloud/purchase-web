@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { db, money } from "@/lib/db";
-import { deleteRfq, sendRfqEmail, approveInbound, rejectInbound, addManualQuote } from "@/app/actions";
+import { deleteRfq, sendRfqEmail, approveInbound, rejectInbound, addManualQuote, deleteQuote } from "@/app/actions";
 import CopyLink from "@/app/rfq/[id]/CopyLink";
 import AdminShell from "@/app/AdminShell";
+import SubmitButton from "@/app/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -195,7 +196,7 @@ export default async function RfqDetail({ params, searchParams }) {
                 </tbody>
               </table>
             </div>
-            <button className="btn" type="submit" style={{ marginTop: 12 }}>Add quote</button>
+            <SubmitButton className="btn" style={{ marginTop: 12 }} pendingText="Adding…">Add quote</SubmitButton>
           </form>
         </div>
 
@@ -397,7 +398,7 @@ export default async function RfqDetail({ params, searchParams }) {
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table>
-                <thead><tr><th>Vendor</th><th>Contact</th><th>Notes / spec</th><th>File</th><th>Submitted</th></tr></thead>
+                <thead><tr><th>Vendor</th><th>Contact</th><th>Notes / spec</th><th>File</th><th>Submitted</th><th></th></tr></thead>
                 <tbody>
                   {quotes.map((q) => (
                     <tr key={q.id}>
@@ -410,6 +411,13 @@ export default async function RfqDetail({ params, searchParams }) {
                         ) : "—"}
                       </td>
                       <td>{new Date(q.submitted_at).toLocaleString()}</td>
+                      <td>
+                        <form action={deleteQuote}>
+                          <input type="hidden" name="quote_id" value={q.id} />
+                          <input type="hidden" name="rfq_id" value={id} />
+                          <button className="btn danger sm" type="submit">Delete</button>
+                        </form>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

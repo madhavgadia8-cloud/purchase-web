@@ -74,6 +74,16 @@ export async function deleteRfq(formData) {
   redirect("/requirements");
 }
 
+export async function deleteQuote(formData) {
+  const quoteId = formData.get("quote_id");
+  const rfqId = formData.get("rfq_id");
+  const supabase = db();
+  await supabase.from("quote_lines").delete().eq("quote_id", quoteId);
+  await supabase.from("quotes").delete().eq("id", quoteId);
+  revalidatePath(`/rfq/${rfqId}`);
+  redirect(`/rfq/${rfqId}`);
+}
+
 /* ---------------- Products ---------------- */
 export async function createProduct(formData) {
   const name = (formData.get("name") || "").trim();
